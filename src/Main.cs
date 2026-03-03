@@ -1,7 +1,9 @@
-﻿using Il2CppTMPro;
+﻿using Il2CppRUMBLE.Interactions.InteractionBase;
+using Il2CppTMPro;
 using MelonLoader;
 using RumbleModdingAPI.RMAPI;
 using UnityEngine;
+using UnityEngine.Playables;
 using Object = UnityEngine.Object;
 using Stream = Il2CppSystem.IO.Stream;
 
@@ -187,9 +189,10 @@ internal class Button : MonoBehaviour
         Vector3 leftHandPos = RumbleModdingAPI.RMAPI.Calls.Players.GetLocalPlayer().Controller.PlayerScaling
             .rigDefinition.LeftHandDefinition.Transform.position;
         
+        Vector3 pos = new Vector3(Parent.transform.position.x, Parent.transform.position.y + 0.04f, Parent.transform.position.z);
     
-        float distRight = Vector3.Magnitude(rightHandPos - Parent.transform.position);
-        float distLeft = Vector3.Magnitude(leftHandPos - Parent.transform.position);
+        float distRight = Vector3.Magnitude(rightHandPos - pos);
+        float distLeft = Vector3.Magnitude(leftHandPos - pos);
     
         float dist = Math.Min(distRight, distLeft);
         
@@ -236,10 +239,12 @@ internal class Big_Button : MonoBehaviour
 
         var is_pressed = false;
 
+        Vector3 pos = new Vector3(Parents[0].transform.position.x, Parents[0].transform.position.y + 0.04f, Parents[0].transform.position.z);
+        
         foreach (GameObject parent in Parents)
         {
-            float distRight = Vector3.Magnitude(rightHandPos - parent.transform.position);
-            float distLeft = Vector3.Magnitude(leftHandPos - parent.transform.position);
+            float distRight = Vector3.Magnitude(rightHandPos - pos);
+            float distLeft = Vector3.Magnitude(leftHandPos - pos);
 
             float dist = Math.Min(distRight, distLeft);
 
