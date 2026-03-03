@@ -2,6 +2,7 @@ This is an API that adds a Keyboard
 
 EXAMPLE USAGE:
 
+```
 public string CurrentScene = "Loader";
 public GameObject? CubeMesh;
 
@@ -29,6 +30,7 @@ public void onKeyPressed(string key)
         written += key;
     }
 }
+```
 
 In a Mod
 
