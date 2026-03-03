@@ -51,6 +51,11 @@ public class Main : MelonMod
 
     public GameObject BuildKeyboard(Vector3 pos, Quaternion rot, Action<string> onKeyPressed)
     {
+        if (CubeMesh == null)
+        {
+            CubeMesh = Il2CppRUMBLE.Managers.PoolManager.instance.GetAllStructurePrefabsFromPool()[5].processableComponent.gameObject.transform.GetChild(0).gameObject;
+        }
+        
         GameObject Keyboard = new GameObject();
         
         Keyboard.name = "Keyboard";
