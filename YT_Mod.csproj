@@ -7,8 +7,14 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <Reference Include="0Harmony">
+        <HintPath>G:\Steam\steamapps\common\RUMBLE\MelonLoader\net6\0Harmony.dll</HintPath>
+      </Reference>
       <Reference Include="Il2CppBucketheadEntertainment.Plugins">
         <HintPath>G:\Steam\steamapps\common\RUMBLE\MelonLoader\Il2CppAssemblies\Il2CppBucketheadEntertainment.Plugins.dll</HintPath>
+      </Reference>
+      <Reference Include="Il2CppInterop.HarmonySupport">
+        <HintPath>G:\Steam\steamapps\common\RUMBLE\MelonLoader\net6\Il2CppInterop.HarmonySupport.dll</HintPath>
       </Reference>
       <Reference Include="Il2CppInterop.Runtime">
         <HintPath>G:\Steam\steamapps\common\RUMBLE\MelonLoader\net6\Il2CppInterop.Runtime.dll</HintPath>

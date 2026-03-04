@@ -1,4 +1,8 @@
-﻿using Il2CppRUMBLE.Interactions.InteractionBase;
+﻿using HarmonyLib;
+using Il2CppRUMBLE.Input;
+using Il2CppRUMBLE.Interactions.InteractionBase;
+using Il2CppRUMBLE.Players;
+using Il2CppRUMBLE.Players.Subsystems;
 using Il2CppTMPro;
 using MelonLoader;
 using RumbleModdingAPI.RMAPI;
@@ -31,9 +35,19 @@ public class Main : MelonMod
         CurrentScene = sceneName;
 
         if (sceneName != "Loader")
-        { 
+        {
+            Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates.lHandInput = PlayerHandPresence.HandPresenceInput.Empty;
+            Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates.rHandInput = PlayerHandPresence.HandPresenceInput.Empty;
+            
             BuildKeyboard(new Vector3(2.0f, 1.5f, 0.0f), Quaternion.Euler(-45, 0, 0), onKeyPressed);
         }
+    }
+
+    public override void OnFixedUpdate()
+    {
+        Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates.lHandInput.thumbInput = 1.0f;
+        Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates.lHandInput.gripInput = 1.0f;
+        Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates.lHandInput.indexInput = 0.0f;
     }
 
     public String written = "";
@@ -266,5 +280,25 @@ internal class Big_Button : MonoBehaviour
             OnPressed?.Invoke(Letter);
             // Parents[0].transform.parent.GetChild(0).GetComponent<TextMeshPro>().text = Parents[0].transform.parent.GetChild(0).GetComponent<TextMeshPro>().text + Letter;
         }
+    }
+}
+
+[HarmonyPatch(typeof(PlayerHandPresence), nameof(PlayerHandPresence.UpdateHandPresenceAnimationStates))]
+public class Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates
+{
+    public static PlayerHandPresence.HandPresenceInput lHandInput;
+    public static PlayerHandPresence.HandPresenceInput rHandInput;
+    
+    static void Prefix(PlayerHandPresence __instance, InputManager.Hand hand, ref PlayerHandPresence.HandPresenceInput input)
+    {
+        MelonLogger.Msg("HIIII");
+        
+        if (__instance.parentController == null) return;
+        
+        MelonLogger.Msg("HIIII2");
+
+        input = hand == InputManager.Hand.Left
+            ? lHandInput
+            : rHandInput;
     }
 }
