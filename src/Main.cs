@@ -1,15 +1,9 @@
-﻿using HarmonyLib;
-using Il2CppRUMBLE.Input;
-using Il2CppRUMBLE.Interactions.InteractionBase;
-using Il2CppRUMBLE.Players;
-using Il2CppRUMBLE.Players.Subsystems;
+﻿using Il2CppRUMBLE.Interactions.InteractionBase;
 using Il2CppTMPro;
 using MelonLoader;
 using RumbleModdingAPI.RMAPI;
 using UnityEngine;
-using UnityEngine.Playables;
 using Object = UnityEngine.Object;
-using Stream = Il2CppSystem.IO.Stream;
 
 [assembly: MelonInfo(typeof(YT_Mod.Main), YT_Mod.BuildInfo.Name, YT_Mod.BuildInfo.Version, YT_Mod.BuildInfo.Author)]
 [assembly: MelonGame("Buckethead Entertainment", "RUMBLE")]
@@ -36,8 +30,7 @@ public class Main : MelonMod
 
         if (sceneName != "Loader")
         {
-            Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates.lHandInput = PlayerHandPresence.HandPresenceInput.Empty;
-            Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates.rHandInput = PlayerHandPresence.HandPresenceInput.Empty;
+            
             
             BuildKeyboard(new Vector3(2.0f, 1.5f, 0.0f), Quaternion.Euler(-45, 0, 0), onKeyPressed);
         }
@@ -45,9 +38,7 @@ public class Main : MelonMod
 
     public override void OnFixedUpdate()
     {
-        Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates.lHandInput.thumbInput = 1.0f;
-        Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates.lHandInput.gripInput = 1.0f;
-        Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates.lHandInput.indexInput = 0.0f;
+        
     }
 
     public String written = "";
@@ -125,6 +116,7 @@ public class Main : MelonMod
         newCube.transform.localRotation = Quaternion.identity;
         newCube.transform.localScale = Vector3.one / 10f;
         newCube.name = "Button";
+        newCube.AddComponent<Fingi>();
                 
         var text = Create.NewText();
         text.transform.parent = newCube.transform;
@@ -283,22 +275,7 @@ internal class Big_Button : MonoBehaviour
     }
 }
 
-[HarmonyPatch(typeof(PlayerHandPresence), nameof(PlayerHandPresence.UpdateHandPresenceAnimationStates))]
-public class Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates
+[RegisterTypeInIl2Cpp]
+internal class Fingi : InteractionBase
 {
-    public static PlayerHandPresence.HandPresenceInput lHandInput;
-    public static PlayerHandPresence.HandPresenceInput rHandInput;
-    
-    static void Prefix(PlayerHandPresence __instance, InputManager.Hand hand, ref PlayerHandPresence.HandPresenceInput input)
-    {
-        MelonLogger.Msg("HIIII");
-        
-        if (__instance.parentController == null) return;
-        
-        MelonLogger.Msg("HIIII2");
-
-        input = hand == InputManager.Hand.Left
-            ? lHandInput
-            : rHandInput;
-    }
 }
