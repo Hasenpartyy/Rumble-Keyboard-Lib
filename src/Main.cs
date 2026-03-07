@@ -72,6 +72,8 @@ public class Main : MelonMod
         Keyboard.name = "Keyboard";
         Keyboard.transform.position = pos;
         Keyboard.transform.rotation = rot;
+        Keyboard.AddComponent<Keyboard>().Position = Keyboard.transform.position;
+        Keyboard.GetComponent<Keyboard>().Rotation = Keyboard.transform.rotation;
         
         /*
         var outText = Create.NewText();
@@ -86,6 +88,8 @@ public class Main : MelonMod
 
         String letter = "";
         
+        Vector3 size = Vector3.zero;
+        
         for (int x = 0; x < 10; x++)
         {
             for (int z = 0; z < 3; z++)
@@ -96,8 +100,12 @@ public class Main : MelonMod
                 {
                     CreateNewButton(new Vector3(0.12f * x, 0.0f, -0.12f * z), Quaternion.identity, letter, Keyboard, onKeyPressed);
                 }
+                
+                size = new Vector3(0.12f * x, 0.24f, -0.12f * z);
             }
         }
+        
+        Keyboard.GetComponent<Keyboard>().Size = size;
         
         CreateNewBigButton(new Vector3(0.12f * 7, 0.0f, -0.12f * 2), Quaternion.identity, "Enter", 3, 0.12f, Keyboard, onKeyPressed);
 
@@ -191,17 +199,14 @@ internal class Button : MonoBehaviour
 
         if (player.Controller?.PlayerScaling?.rigDefinition == null) return;
     
-        Vector3 rightHandPos = RumbleModdingAPI.RMAPI.Calls.Players.GetLocalPlayer().Controller.PlayerScaling
-            .rigDefinition.RightHandDefinition.Transform.position;
-    
-        Vector3 leftHandPos = RumbleModdingAPI.RMAPI.Calls.Players.GetLocalPlayer().Controller.PlayerScaling
-            .rigDefinition.LeftHandDefinition.Transform.position;
+        Vector3 rightHandPos = RumbleModdingAPI.RMAPI.Calls.Players.GetLocalPlayer().Controller.PlayerHandPresence.righthand.Index.BoneC.position;
+        Vector3 leftHandPos = RumbleModdingAPI.RMAPI.Calls.Players.GetLocalPlayer().Controller.PlayerHandPresence.lefthand.Index.BoneC.position;
         
         Vector3 pos = Parent.transform.position;
         Quaternion rot = Parent.transform.rotation;
 
-        float size = 0.12f;
-        Vector3 normal = rot * Vector3.forward * size;
+        float size = 0.02f;
+        Vector3 normal = rot * Vector3.up * size;
         pos += normal;
         
         float distRight = Vector3.Magnitude(rightHandPos - pos);
@@ -244,18 +249,20 @@ internal class Big_Button : MonoBehaviour
         if (player.Controller?.PlayerScaling?.rigDefinition == null) return;
         
     
-        Vector3 rightHandPos = RumbleModdingAPI.RMAPI.Calls.Players.GetLocalPlayer().Controller.PlayerScaling
-            .rigDefinition.RightHandDefinition.Transform.position;
-    
-        Vector3 leftHandPos = RumbleModdingAPI.RMAPI.Calls.Players.GetLocalPlayer().Controller.PlayerScaling
-            .rigDefinition.LeftHandDefinition.Transform.position;
+        Vector3 rightHandPos = RumbleModdingAPI.RMAPI.Calls.Players.GetLocalPlayer().Controller.PlayerHandPresence.righthand.Index.BoneC.position;
+        Vector3 leftHandPos = RumbleModdingAPI.RMAPI.Calls.Players.GetLocalPlayer().Controller.PlayerHandPresence.lefthand.Index.BoneC.position;
 
         var is_pressed = false;
-
-        Vector3 pos = new Vector3(Parents[0].transform.position.x, Parents[0].transform.position.y + 0.04f, Parents[0].transform.position.z);
         
         foreach (GameObject parent in Parents)
         {
+            Vector3 pos = parent.transform.position;
+            Quaternion rot = parent.transform.rotation;
+
+            float size = 0.02f;
+            Vector3 normal = rot * Vector3.up * size;
+            pos += normal;
+            
             float distRight = Vector3.Magnitude(rightHandPos - pos);
             float distLeft = Vector3.Magnitude(leftHandPos - pos);
 
@@ -286,8 +293,21 @@ internal class Big_Button : MonoBehaviour
 internal class Keyboard : MonoBehaviour
 {
     public Vector3 Position = new Vector3(0.0f, 0.0f, 0.0f);
+    public Quaternion Rotation = new Quaternion(0.0f, 0.0f, 0.0f, 1.0f);
     public Vector3 Size = new Vector3(2.0f, 2.0f, 2.0f);
 
+    private bool InBounds(Vector3 position)
+    {
+        Vector3 localPoint = Quaternion.Inverse(Rotation) * (position - Position);
+        Vector3 halfSize = Size * 0.5f;
+
+        bool inside = Mathf.Abs(localPoint.x) <= halfSize.x &&
+                      Mathf.Abs(localPoint.y) <= halfSize.y &&
+                      Mathf.Abs(localPoint.z) <= halfSize.z;
+        
+        return inside;
+    }
+    
     public void FixedUpdate()
     {
         Vector3 rightHandPos = RumbleModdingAPI.RMAPI.Calls.Players.GetLocalPlayer().Controller.PlayerScaling
@@ -295,16 +315,22 @@ internal class Keyboard : MonoBehaviour
     
         Vector3 leftHandPos = RumbleModdingAPI.RMAPI.Calls.Players.GetLocalPlayer().Controller.PlayerScaling
             .rigDefinition.LeftHandDefinition.Transform.position;
-        
-        Bounds bounds = new Bounds(Position, Size);
 
-        if (bounds.Contains(leftHandPos))
+        if (InBounds(leftHandPos))
         {
-            Debug.Log("Inside box");
+            Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates.lHandInput = new PlayerHandPresence.HandPresenceInput(0.0f, 1.0f, 1.0f, 0.0f);
         }
-        if (bounds.Contains(rightHandPos))
+        else
         {
-            Debug.Log("Inside box");
+            Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates.lHandInput = null;
+        }
+        if (InBounds(rightHandPos))
+        {
+            Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates.rHandInput = new PlayerHandPresence.HandPresenceInput(0.0f, 1.0f, 1.0f, 0.0f);
+        }
+        else
+        {
+            Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates.rHandInput = null;
         }
     }
 }
@@ -312,8 +338,8 @@ internal class Keyboard : MonoBehaviour
 [HarmonyPatch(typeof(PlayerHandPresence), nameof(PlayerHandPresence.UpdateHandPresenceAnimationStates))]
 public class Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates
 {
-    public static PlayerHandPresence.HandPresenceInput lHandInput;
-    public static PlayerHandPresence.HandPresenceInput rHandInput;
+    public static PlayerHandPresence.HandPresenceInput? lHandInput;
+    public static PlayerHandPresence.HandPresenceInput? rHandInput;
     
     static void Prefix(PlayerHandPresence __instance, InputManager.Hand hand, ref PlayerHandPresence.HandPresenceInput input)
     {
@@ -321,11 +347,10 @@ public class Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates
         
         if (__instance.parentController.ControllerType != ControllerType.Local) return;
         
-        lHandInput = new PlayerHandPresence.HandPresenceInput(0.0f, 1.0f, 1.0f, 0.0f);
-        rHandInput = new PlayerHandPresence.HandPresenceInput(0.0f, 1.0f, 1.0f, 0.0f);
+        if (hand == InputManager.Hand.Left && lHandInput is { } l)
+            input = l;
 
-        input = hand == InputManager.Hand.Left
-            ? lHandInput
-            : rHandInput;
+        if (hand == InputManager.Hand.Right && rHandInput is { } r)
+            input = r;
     }
 }
