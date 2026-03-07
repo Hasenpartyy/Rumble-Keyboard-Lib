@@ -1,4 +1,8 @@
-﻿using Il2CppRUMBLE.Interactions.InteractionBase;
+﻿using HarmonyLib;
+using Il2CppRUMBLE.Input;
+using Il2CppRUMBLE.Interactions.InteractionBase;
+using Il2CppRUMBLE.Players;
+using Il2CppRUMBLE.Players.Subsystems;
 using Il2CppTMPro;
 using MelonLoader;
 using RumbleModdingAPI.RMAPI;
@@ -116,7 +120,6 @@ public class Main : MelonMod
         newCube.transform.localRotation = Quaternion.identity;
         newCube.transform.localScale = Vector3.one / 10f;
         newCube.name = "Button";
-        newCube.AddComponent<Fingi>();
                 
         var text = Create.NewText();
         text.transform.parent = newCube.transform;
@@ -187,7 +190,6 @@ internal class Button : MonoBehaviour
         if (Parent == null) return;
 
         if (player.Controller?.PlayerScaling?.rigDefinition == null) return;
-        
     
         Vector3 rightHandPos = RumbleModdingAPI.RMAPI.Calls.Players.GetLocalPlayer().Controller.PlayerScaling
             .rigDefinition.RightHandDefinition.Transform.position;
@@ -195,8 +197,13 @@ internal class Button : MonoBehaviour
         Vector3 leftHandPos = RumbleModdingAPI.RMAPI.Calls.Players.GetLocalPlayer().Controller.PlayerScaling
             .rigDefinition.LeftHandDefinition.Transform.position;
         
-        Vector3 pos = new Vector3(Parent.transform.position.x, Parent.transform.position.y + 0.04f, Parent.transform.position.z);
-    
+        Vector3 pos = Parent.transform.position;
+        Quaternion rot = Parent.transform.rotation;
+
+        float size = 0.12f;
+        Vector3 normal = rot * Vector3.forward * size;
+        pos += normal;
+        
         float distRight = Vector3.Magnitude(rightHandPos - pos);
         float distLeft = Vector3.Magnitude(leftHandPos - pos);
     
@@ -276,6 +283,49 @@ internal class Big_Button : MonoBehaviour
 }
 
 [RegisterTypeInIl2Cpp]
-internal class Fingi : InteractionBase
+internal class Keyboard : MonoBehaviour
 {
+    public Vector3 Position = new Vector3(0.0f, 0.0f, 0.0f);
+    public Vector3 Size = new Vector3(2.0f, 2.0f, 2.0f);
+
+    public void FixedUpdate()
+    {
+        Vector3 rightHandPos = RumbleModdingAPI.RMAPI.Calls.Players.GetLocalPlayer().Controller.PlayerScaling
+            .rigDefinition.RightHandDefinition.Transform.position;
+    
+        Vector3 leftHandPos = RumbleModdingAPI.RMAPI.Calls.Players.GetLocalPlayer().Controller.PlayerScaling
+            .rigDefinition.LeftHandDefinition.Transform.position;
+        
+        Bounds bounds = new Bounds(Position, Size);
+
+        if (bounds.Contains(leftHandPos))
+        {
+            Debug.Log("Inside box");
+        }
+        if (bounds.Contains(rightHandPos))
+        {
+            Debug.Log("Inside box");
+        }
+    }
+}
+
+[HarmonyPatch(typeof(PlayerHandPresence), nameof(PlayerHandPresence.UpdateHandPresenceAnimationStates))]
+public class Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates
+{
+    public static PlayerHandPresence.HandPresenceInput lHandInput;
+    public static PlayerHandPresence.HandPresenceInput rHandInput;
+    
+    static void Prefix(PlayerHandPresence __instance, InputManager.Hand hand, ref PlayerHandPresence.HandPresenceInput input)
+    {
+        if (__instance.parentController == null) return;
+        
+        if (__instance.parentController.ControllerType != ControllerType.Local) return;
+        
+        lHandInput = new PlayerHandPresence.HandPresenceInput(0.0f, 1.0f, 1.0f, 0.0f);
+        rHandInput = new PlayerHandPresence.HandPresenceInput(0.0f, 1.0f, 1.0f, 0.0f);
+
+        input = hand == InputManager.Hand.Left
+            ? lHandInput
+            : rHandInput;
+    }
 }
