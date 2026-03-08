@@ -72,8 +72,6 @@ public class Main : MelonMod
         Keyboard.name = "Keyboard";
         Keyboard.transform.position = pos;
         Keyboard.transform.rotation = rot;
-        Keyboard.AddComponent<Keyboard>().Position = Keyboard.transform.position;
-        Keyboard.GetComponent<Keyboard>().Rotation = Keyboard.transform.rotation;
         
         /*
         var outText = Create.NewText();
@@ -101,11 +99,9 @@ public class Main : MelonMod
                     CreateNewButton(new Vector3(0.12f * x, 0.0f, -0.12f * z), Quaternion.identity, letter, Keyboard, onKeyPressed);
                 }
                 
-                size = new Vector3(0.12f * x, 0.24f, -0.12f * z);
+                size = new Vector3(0.12f * x, 0.5f, -0.12f * z);
             }
         }
-        
-        Keyboard.GetComponent<Keyboard>().Size = size;
         
         CreateNewBigButton(new Vector3(0.12f * 7, 0.0f, -0.12f * 2), Quaternion.identity, "Enter", 3, 0.12f, Keyboard, onKeyPressed);
 
@@ -206,11 +202,33 @@ internal class Button : MonoBehaviour
         Quaternion rot = Parent.transform.rotation;
 
         float size = 0.02f;
-        Vector3 normal = rot * Vector3.up * size;
-        pos += normal;
+        Vector3 normal = rot * Vector3.up;
         
-        float distRight = Vector3.Magnitude(rightHandPos - pos);
-        float distLeft = Vector3.Magnitude(leftHandPos - pos);
+        Vector3 pos_point = pos + (normal * 0.14f);
+        pos += normal * size;
+        
+        float distRight = Vector3.Magnitude(rightHandPos - pos_point);
+        float distLeft = Vector3.Magnitude(leftHandPos - pos_point);
+        
+        if (distLeft < 0.1f)
+        {
+            Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates.lHandInput = new PlayerHandPresence.HandPresenceInput(0.0f, 1.0f, 1.0f, 0.0f);
+        }
+        else
+        {
+            Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates.lHandInput = null;
+        }
+        if (distRight < 0.1f)
+        {
+            Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates.rHandInput = new PlayerHandPresence.HandPresenceInput(0.0f, 1.0f, 1.0f, 0.0f);
+        }
+        else
+        {
+            Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates.rHandInput = null;
+        }
+        
+        distRight = Vector3.Magnitude(rightHandPos - pos);
+        distLeft = Vector3.Magnitude(leftHandPos - pos);
     
         float dist = Math.Min(distRight, distLeft);
         
@@ -260,11 +278,33 @@ internal class Big_Button : MonoBehaviour
             Quaternion rot = parent.transform.rotation;
 
             float size = 0.02f;
-            Vector3 normal = rot * Vector3.up * size;
-            pos += normal;
+            Vector3 normal = rot * Vector3.up;
             
-            float distRight = Vector3.Magnitude(rightHandPos - pos);
-            float distLeft = Vector3.Magnitude(leftHandPos - pos);
+            Vector3 pos_point = pos + (normal * 0.14f);
+            pos += normal * size;
+        
+            float distRight = Vector3.Magnitude(rightHandPos - pos_point);
+            float distLeft = Vector3.Magnitude(leftHandPos - pos_point);
+        
+            if (distLeft < 0.1f)
+            {
+                Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates.lHandInput = new PlayerHandPresence.HandPresenceInput(0.0f, 1.0f, 1.0f, 0.0f);
+            }
+            else
+            {
+                Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates.lHandInput = null;
+            }
+            if (distRight < 0.1f)
+            {
+                Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates.rHandInput = new PlayerHandPresence.HandPresenceInput(0.0f, 1.0f, 1.0f, 0.0f);
+            }
+            else
+            {
+                Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates.rHandInput = null;
+            }
+            
+            distRight = Vector3.Magnitude(rightHandPos - pos);
+            distLeft = Vector3.Magnitude(leftHandPos - pos);
 
             float dist = Math.Min(distRight, distLeft);
 
@@ -285,52 +325,6 @@ internal class Big_Button : MonoBehaviour
             Parents[0].transform.GetChild(0).transform.localPosition = Default_Position;
             OnPressed?.Invoke(Letter);
             // Parents[0].transform.parent.GetChild(0).GetComponent<TextMeshPro>().text = Parents[0].transform.parent.GetChild(0).GetComponent<TextMeshPro>().text + Letter;
-        }
-    }
-}
-
-[RegisterTypeInIl2Cpp]
-internal class Keyboard : MonoBehaviour
-{
-    public Vector3 Position = new Vector3(0.0f, 0.0f, 0.0f);
-    public Quaternion Rotation = new Quaternion(0.0f, 0.0f, 0.0f, 1.0f);
-    public Vector3 Size = new Vector3(2.0f, 2.0f, 2.0f);
-
-    private bool InBounds(Vector3 position)
-    {
-        Vector3 localPoint = Quaternion.Inverse(Rotation) * (position - Position);
-        Vector3 halfSize = Size * 0.5f;
-
-        bool inside = Mathf.Abs(localPoint.x) <= halfSize.x &&
-                      Mathf.Abs(localPoint.y) <= halfSize.y &&
-                      Mathf.Abs(localPoint.z) <= halfSize.z;
-        
-        return inside;
-    }
-    
-    public void FixedUpdate()
-    {
-        Vector3 rightHandPos = RumbleModdingAPI.RMAPI.Calls.Players.GetLocalPlayer().Controller.PlayerScaling
-            .rigDefinition.RightHandDefinition.Transform.position;
-    
-        Vector3 leftHandPos = RumbleModdingAPI.RMAPI.Calls.Players.GetLocalPlayer().Controller.PlayerScaling
-            .rigDefinition.LeftHandDefinition.Transform.position;
-
-        if (InBounds(leftHandPos))
-        {
-            Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates.lHandInput = new PlayerHandPresence.HandPresenceInput(0.0f, 1.0f, 1.0f, 0.0f);
-        }
-        else
-        {
-            Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates.lHandInput = null;
-        }
-        if (InBounds(rightHandPos))
-        {
-            Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates.rHandInput = new PlayerHandPresence.HandPresenceInput(0.0f, 1.0f, 1.0f, 0.0f);
-        }
-        else
-        {
-            Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates.rHandInput = null;
         }
     }
 }
