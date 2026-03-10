@@ -329,6 +329,27 @@ internal class Big_Button : MonoBehaviour
     }
 }
 
+[RegisterTypeInIl2Cpp]
+internal class Keyboard : MonoBehaviour
+{
+    public bool Following = false;
+    public float Distance = 2.0f;
+    
+    public void FixedUpdate()
+    {
+        var player = RumbleModdingAPI.RMAPI.Calls.Players.GetLocalPlayer();
+        if (player == null) return;
+        if (player.Controller?.PlayerScaling?.rigDefinition == null) return;
+
+        Vector3 bodyPos = player.Controller.transform.position;
+        Quaternion bodyRot = player.Controller.transform.rotation;
+
+        Vector3 newPos = Vector3.Normalize(bodyRot * bodyPos);
+
+        Melonlogger.Msg(newPos);
+    }
+}
+
 [HarmonyPatch(typeof(PlayerHandPresence), nameof(PlayerHandPresence.UpdateHandPresenceAnimationStates))]
 public class Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates
 {
