@@ -333,20 +333,27 @@ internal class Big_Button : MonoBehaviour
 internal class Keyboard : MonoBehaviour
 {
     public bool Following = false;
-    public float Distance = 2.0f;
+    public float distance = 2.0f;
+    public GameObject? Parent;
     
     public void FixedUpdate()
     {
         var player = RumbleModdingAPI.RMAPI.Calls.Players.GetLocalPlayer();
         if (player == null) return;
         if (player.Controller?.PlayerScaling?.rigDefinition == null) return;
+        if (Parent == null) return;
 
-        Vector3 bodyPos = player.Controller.transform.position;
-        Quaternion bodyRot = player.Controller.transform.rotation;
+        if (Following)
+        {
+            Vector3 bodyPos = player.Controller.transform.position;
+            Quaternion bodyRot = player.Controller.transform.rotation;
 
-        Vector3 newPos = Vector3.Normalize(bodyRot * bodyPos);
+            Vector3 newPos = bodyPos + (Vector3.Normalize(bodyRot * bodyPos) * distance);
 
-        Melonlogger.Msg(newPos);
+            Parent.transform.position = newPos;
+
+            Melonlogger.Msg(newPos);
+        }
     }
 }
 
