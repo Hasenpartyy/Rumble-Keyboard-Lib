@@ -72,6 +72,8 @@ public class Main : MelonMod
         Keyboard.name = "Keyboard";
         Keyboard.transform.position = pos;
         Keyboard.transform.rotation = rot;
+        Keyboard.AddComponent<Keyboard>().Parent = Keyboard;
+        Keyboard.GetComponent<Keyboard>().Following = true;
         
         /*
         var outText = Create.NewText();
@@ -86,7 +88,7 @@ public class Main : MelonMod
 
         String letter = "";
         
-        Vector3 size = Vector3.zero;
+        Vector3 offset = new Vector3(0.12f * 5f, 0.0f, -0.12f * 2f);
         
         for (int x = 0; x < 10; x++)
         {
@@ -96,14 +98,12 @@ public class Main : MelonMod
 
                 if (letter != " ")
                 {
-                    CreateNewButton(new Vector3(0.12f * x, 0.0f, -0.12f * z), Quaternion.identity, letter, Keyboard, onKeyPressed);
+                    CreateNewButton(new Vector3(0.12f * x, 0.0f, -0.12f * z) - offset, Quaternion.identity, letter, Keyboard, onKeyPressed);
                 }
-                
-                size = new Vector3(0.12f * x, 0.5f, -0.12f * z);
             }
         }
         
-        CreateNewBigButton(new Vector3(0.12f * 7, 0.0f, -0.12f * 2), Quaternion.identity, "Enter", 3, 0.12f, Keyboard, onKeyPressed);
+        CreateNewBigButton(new Vector3(0.12f * 7, 0.0f, -0.12f * 2) - offset, Quaternion.identity, "Enter", 3, 0.12f, Keyboard, onKeyPressed);
 
         return Keyboard;
     }
@@ -333,26 +333,40 @@ internal class Big_Button : MonoBehaviour
 internal class Keyboard : MonoBehaviour
 {
     public bool Following = false;
-    public float distance = 2.0f;
+    public float distance = 0.6f;
     public GameObject? Parent;
+    public float player_height = 1.2f;
     
     public void FixedUpdate()
     {
         var player = RumbleModdingAPI.RMAPI.Calls.Players.GetLocalPlayer();
         if (player == null) return;
-        if (player.Controller?.PlayerScaling?.rigDefinition == null) return;
         if (Parent == null) return;
 
         if (Following)
         {
-            Vector3 bodyPos = player.Controller.transform.position;
-            Quaternion bodyRot = player.Controller.transform.rotation;
+            
+            var cam = Camera.main;
+            if (cam == null) return;
+            
+            Vector3 forward = cam.transform.forward;
+            forward.y = 0f;
+            forward.Normalize();
 
-            Vector3 newPos = bodyPos + (Vector3.Normalize(bodyRot * bodyPos) * distance);
+            Vector3 bodyPos = player.Controller.PlayerPhysics.transform.position;
+            Vector3 newPos = bodyPos + forward * distance;
+
+            Vector3 dir = newPos- cam.transform.position;
+            dir.y = 0f;
+
+            if (dir != Vector3.zero)
+            {
+                Parent.transform.rotation = Quaternion.LookRotation(dir) * Quaternion.Euler(-45f, 0f, 0f);
+            }
+            
+            newPos.y += player_height;
 
             Parent.transform.position = newPos;
-
-            Melonlogger.Msg(newPos);
         }
     }
 }
