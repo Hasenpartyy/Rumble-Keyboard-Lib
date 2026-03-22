@@ -1,12 +1,12 @@
 ﻿using HarmonyLib;
 using Il2CppRUMBLE.Input;
-using Il2CppRUMBLE.Interactions.InteractionBase;
 using Il2CppRUMBLE.Players;
 using Il2CppRUMBLE.Players.Subsystems;
 using Il2CppTMPro;
 using MelonLoader;
 using RumbleModdingAPI.RMAPI;
 using UnityEngine;
+using UnityEngine.Serialization;
 using Object = UnityEngine.Object;
 
 [assembly: MelonInfo(typeof(YT_Mod.Main), YT_Mod.BuildInfo.Name, YT_Mod.BuildInfo.Version, YT_Mod.BuildInfo.Author)]
@@ -26,7 +26,7 @@ public static class BuildInfo
 public class Main : MelonMod
 {
     public string CurrentScene = "Loader";
-    public GameObject? CubeMesh;
+    private GameObject? CubeMesh;
     
     public override void OnSceneWasLoaded(int buildIndex, string sceneName)
     {
@@ -36,7 +36,7 @@ public class Main : MelonMod
         {
             
             
-            BuildKeyboard(new Vector3(2.0f, 1.5f, 0.0f), Quaternion.Euler(-45, 0, 0), onKeyPressed);
+            BuildKeyboard(new Vector3(2.0f, 1.5f, 0.0f), Quaternion.Euler(-45, 0, 0), KeyPressed, true);
         }
     }
 
@@ -45,35 +45,35 @@ public class Main : MelonMod
         
     }
 
-    public String written = "";
+    private String Written = "";
 
-    public void onKeyPressed(string key)
+    public void KeyPressed(string key)
     {
         if (key == "Enter")
         {
-            MelonLogger.Msg(written);
-            written = "";
+            MelonLogger.Msg(Written);
+            Written = "";
         }
         else
         {
-            written += key;
+            Written += key;
         }
     }
 
-    public GameObject BuildKeyboard(Vector3 pos, Quaternion rot, Action<string> onKeyPressed)
+    public GameObject BuildKeyboard(Vector3 pos, Quaternion rot, Action<string> onKeyPressed, bool Following)
     {
         if (CubeMesh == null)
         {
             CubeMesh = Il2CppRUMBLE.Managers.PoolManager.instance.GetAllStructurePrefabsFromPool()[5].processableComponent.gameObject.transform.GetChild(0).gameObject;
         }
         
-        GameObject Keyboard = new GameObject();
+        GameObject keyboard = new GameObject();
         
-        Keyboard.name = "Keyboard";
-        Keyboard.transform.position = pos;
-        Keyboard.transform.rotation = rot;
-        Keyboard.AddComponent<Keyboard>().Parent = Keyboard;
-        Keyboard.GetComponent<Keyboard>().Following = true;
+        keyboard.name = "Keyboard";
+        keyboard.transform.position = pos;
+        keyboard.transform.rotation = rot;
+        keyboard.AddComponent<Keyboard>().Parent = keyboard;
+        keyboard.GetComponent<Keyboard>().Following = Following;
         
         /*
         var outText = Create.NewText();
@@ -98,14 +98,14 @@ public class Main : MelonMod
 
                 if (letter != " ")
                 {
-                    CreateNewButton(new Vector3(0.12f * x, 0.0f, -0.12f * z) - offset, Quaternion.identity, letter, Keyboard, onKeyPressed);
+                    CreateNewButton(new Vector3(0.12f * x, 0.0f, -0.12f * z) - offset, Quaternion.identity, letter, keyboard, onKeyPressed);
                 }
             }
         }
         
-        CreateNewBigButton(new Vector3(0.12f * 7, 0.0f, -0.12f * 2) - offset, Quaternion.identity, "Enter", 3, 0.12f, Keyboard, onKeyPressed);
+        CreateNewBigButton(new Vector3(0.12f * 7, 0.0f, -0.12f * 2) - offset, Quaternion.identity, "Enter", 3, 0.12f, keyboard, onKeyPressed);
 
-        return Keyboard;
+        return keyboard;
     }
 
     private void CreateNewButton(Vector3 position, Quaternion rotation, String letter, GameObject keyboard, Action<string> onKeyPressed)
@@ -333,15 +333,22 @@ internal class Big_Button : MonoBehaviour
 internal class Keyboard : MonoBehaviour
 {
     public bool Following = false;
-    public float distance = 0.6f;
+    public float distance = 0.35f;
     public GameObject? Parent;
     public float player_height = 1.2f;
     
-    public void FixedUpdate()
+    public float positionSmoothTime = 0.2f;
+    public float rotationSmoothSpeed = 5f;
+    
+    private Vector3 velocity = Vector3.zero;
+    private Quaternion? lastTargetRotation;
+    
+    public void Update()
     {
         var player = RumbleModdingAPI.RMAPI.Calls.Players.GetLocalPlayer();
         if (player == null) return;
         if (Parent == null) return;
+        if (lastTargetRotation == null) lastTargetRotation = Parent.transform.rotation;
 
         if (Following)
         {
@@ -356,17 +363,39 @@ internal class Keyboard : MonoBehaviour
             Vector3 bodyPos = player.Controller.PlayerPhysics.transform.position;
             Vector3 newPos = bodyPos + forward * distance;
 
-            Vector3 dir = newPos- cam.transform.position;
+            Vector3 dir = newPos - cam.transform.position;
             dir.y = 0f;
 
             if (dir != Vector3.zero)
             {
-                Parent.transform.rotation = Quaternion.LookRotation(dir) * Quaternion.Euler(-45f, 0f, 0f);
+                Quaternion desiredRotation = Quaternion.LookRotation(dir) * Quaternion.Euler(-45f, 0f, 0f);
+                
+                Parent.transform.rotation = Quaternion.Slerp(
+                    Parent.transform.rotation,
+                    desiredRotation,
+                    Time.deltaTime * rotationSmoothSpeed
+                );
             }
             
             newPos.y += player_height;
+            
+            float angleDifference = Quaternion.Angle((Quaternion)lastTargetRotation, Parent.transform.rotation);
+            
+            float dynamicSmoothTime = positionSmoothTime;
+            
+            if (angleDifference > 30f)
+            {
+                dynamicSmoothTime = 0.05f;
+            }
+            
+            Parent.transform.position = Vector3.SmoothDamp(
+                Parent.transform.position,
+                newPos,
+                ref velocity,
+                dynamicSmoothTime
+            );
 
-            Parent.transform.position = newPos;
+            lastTargetRotation = Parent.transform.rotation;
         }
     }
 }
