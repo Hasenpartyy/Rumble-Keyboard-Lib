@@ -85,7 +85,8 @@ public class Main : MelonMod
 
         var keys = "0;Q;W;E;R;T;Z;U;I;O;P;A;S;D;F;G;H;J;K;L; ;Y;X;C;V;B;N;M; ; ; ; ;".Split(";");
 
-        var keyboardKeys = "1,^ 1,1 1,2 1,3 1,4 1,5 1,6 1,7 1,8 1,9 1,0 1,ß 3,Del:/3,Tab 1,q 1,w 1,e 1,r 1,t 1,z 1,u 1,i 1,o 1,p 1,+ 32,Enter";
+        var keyboardKeys = "1,^ 1,1 1,2 1,3 1,4 1,5 1,6 1,7 1,8 1,9 1,0 1,+ 3,Del:/2,Tab s, 1,q 1,w 1,e 1,r 1,t 1,z 1,u 1,i 1,o 1,p 32,Enter:/s, s, 1,a 1,s 1,d 1,f 1,g 1,h 1,j 1,k 1,l:/3,Shift s, s, 1,y 1,x 1,c 3,Space s, s, 1,v 1,b 1,n 1,m 2,Paste";
+        var keyboardKeys_shift = "1,^ 1,! 1,€ 1,§ 1,$ 1,% 1,& 1,/ 1,( 1,) 1,= 1,* 3,Del:/2,Tab s, 1,Q 1,W 1,W 1,R 1,T 1,Z 1,U 1,I 1,O 1,P 32,Enter:/s, s, 1,A 1,S 1,D 1,F 1,G 1,H 1,J 1,K 1,L:/3,Shift s, s, 1,Y 1,X 1,C 3,Space s, s, 1,V 1,B 1,N 1,M 2,Paste";
         var keysize = 0.12f;
         
         List<Vector2> taken_pos = null;
@@ -94,6 +95,8 @@ public class Main : MelonMod
         var y = 0;
         
         var rows = keyboardKeys.Split(":/");
+        Vector3 offset = new Vector3(rows[0].Split(" ").Length*-0.14f/2f, 0.0f, 0.0f);
+        
         for (int i = 0; i < rows.Length; i++)
         {
             var row_keys = rows[i].Split(" ");
@@ -102,30 +105,31 @@ public class Main : MelonMod
                 var new_key = row_keys[j];
                 var name = "";
 
-                Vector2 size = new Vector2(int.Parse(new_key[0].ToString()), 1);
-                if (new_key[1] != ',')
+                if (new_key[0] != 's')
                 {
-                    size.y = int.Parse(new_key[1].ToString());
-                    name = row_keys[j].Substring(3);
-                }
-                
-                else
-                { 
-                    name = row_keys[j].Substring(2);
-                }
+                    Vector2 size = new Vector2(int.Parse(new_key[0].ToString()), 1);
+                    if (new_key[1] != ',')
+                    {
+                        size.y = int.Parse(new_key[1].ToString());
+                        name = row_keys[j].Substring(3);
+                    }
 
-                if (name != " ")
-                {
+                    else
+                    {
+                        name = row_keys[j].Substring(2);
+                    }
+
                     MelonLogger.Msg("Lenght: " + size);
                     MelonLogger.Msg("Key: " + name);
-                    
-                    CreateNewButton(new Vector3(0.12f * x, 0.0f, -0.12f * z) - offset, Quaternion.identity, letter, keyboard, onKeyPressed);
+
+                    CreateNewBigButton(new Vector3(0.14f * x, 0.0f, -0.14f * y) + offset, Quaternion.identity, name, size, 0.12f, keyboard, onKeyPressed, onKeyPressed, onKeyPressed);
                 }
-                
+
                 x++;
             }
 
             y++;
+            x = 0;
         }
         
         /*
@@ -193,10 +197,13 @@ public class Main : MelonMod
         gameobjects.Add(gameObject);
             
         var newCube = Object.Instantiate(_cubeMesh, gameObject.transform);
-        newCube.transform.localPosition = new Vector3((scale.x/2 -0.5f) * size, (scale.y/2 -0.5f) * size, 0.0f);
+        newCube.transform.localPosition = new Vector3((scale.x/2 -0.5f) * size, 0.0f, -(scale.y/2 -0.5f) * size);
         newCube.transform.localRotation = Quaternion.identity;
-        Vector2 scaledScale = scale * size;
-        newCube.transform.localScale = new Vector3(scaledScale.x, scaledScale.y, 0.1f);
+        
+        Vector2 scaledScale = scale * (size+0.02f);
+        scaledScale = new Vector2(scaledScale.x - 0.02f, scaledScale.y - 0.02f);
+        
+        newCube.transform.localScale = new Vector3(scaledScale.x, 0.1f, scaledScale.y);
         newCube.name = "Button";
             
         var text = Create.NewText();
@@ -206,21 +213,24 @@ public class Main : MelonMod
         text.transform.localScale = finalTextSize;
         text.transform.GetComponent<TextMeshPro>().text = letter;
         
-        position = new Vector3(position.x + size, position.y, position.z);
+        position = new Vector3(position.x + size, position.y + size, position.z);
         
-        for (int x = 0; x < cnt-1; x++)
+        for (int y = 0; y < scale.y; y++)
         {
-            gameObject = new GameObject();
-            gameObject.transform.parent = keyboard.transform;
-            gameObject.transform.localPosition = new Vector3(position.x + x*size, 0.0f, position.z);
-            gameObject.transform.localRotation = rotation;
-            gameObject.name = letter;
+            for (int x = 0; x < scale.x; x++)
+            {
+                gameObject = new GameObject();
+                gameObject.transform.parent = keyboard.transform;
+                gameObject.transform.localPosition = new Vector3((float)(position.x + x*(size+0.02)), position.y, -(float)(position.z + y*(size+0.02)));
+                gameObject.transform.localRotation = rotation;
+                gameObject.name = letter;
             
-            gameobjects.Add(gameObject);
+                gameobjects.Add(gameObject);
+            }
         }
         
         gameobjects[0].GetComponent<Keyboard_Button>().buttonParts = gameobjects.ToArray();
-        gameobjects[0].GetComponent<Keyboard_Button>().Default_Position = new Vector3((scale.x/2 -0.5f) * size, (scale.y/2 -0.5f) * size, 0.0f);
+        gameobjects[0].GetComponent<Keyboard_Button>().Default_Position = new Vector3((scale.x/2 -0.5f) * size, 0.0f, -(scale.y/2 -0.5f) * size);
         
         /*
         Vector3 finalTextSize = textSize ?? new Vector3(4f, 10f, 10f);
@@ -349,7 +359,7 @@ internal class Keyboard_Button : MonoBehaviour
     public GameObject[]? buttonParts;
     public Boolean pressed = false;
     
-    private Vector3 Default_Position = new Vector3(0.0f, 0.0f, 0.0f);
+    public Vector3 Default_Position = new Vector3(0.0f, 0.0f, 0.0f);
     
     public void FixedUpdate()
     {
