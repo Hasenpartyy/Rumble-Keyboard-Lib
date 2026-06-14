@@ -34,8 +34,8 @@ public class Main : MelonMod
         if (sceneName != "Loader")
         {
             
-            
-            BuildKeyboard(new Vector3(2.0f, 1.5f, 0.0f), Quaternion.Euler(-45, 0, 0), KeyPressed, true);
+            MelonLogger.Msg("Loaded Keyboard api");
+            // BuildKeyboard(new Vector3(2.0f, 1.5f, 0.0f), Quaternion.Euler(-45, 0, 0), KeyPressed, true);
         }
     }
 
