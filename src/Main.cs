@@ -2,9 +2,8 @@
 using Il2CppRUMBLE.Input;
 using Il2CppRUMBLE.Players;
 using Il2CppRUMBLE.Players.Subsystems;
-using Il2CppTMPro;
 using MelonLoader;
-using RumbleModdingAPI.RMAPI;
+using MelonLoader.Utils;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -31,10 +30,17 @@ public class Main : MelonMod
     {
         CurrentScene = sceneName;
         
+        string defaultPath = Path.Combine(MelonEnvironment.UserDataDirectory, "Keyboard_API");
+        if (!File.Exists(defaultPath))
+        {
+            Directory.CreateDirectory(defaultPath);
+            MelonLogger.Msg("Created Folder for Layouts.");
+        }
+        
         if (sceneName != "Loader")
         {
-            
             MelonLogger.Msg("Loaded Keyboard api");
+            BuildKeyboardFromJson(new Vector3(2.0f, 1.2f, 0.0f), Quaternion.Euler(325, 180, 180), KeyPressed, KeyPressed, KeyPressed, false);
             // BuildKeyboard(new Vector3(2.0f, 1.5f, 0.0f), Quaternion.Euler(-45, 0, 0), KeyPressed, true);
         }
     }
@@ -46,7 +52,7 @@ public class Main : MelonMod
 
     private String _written = "";
 
-    public void KeyPressed(string key)
+    private void KeyPressed(string key)
     {
         if (key == "Enter")
         {
@@ -58,22 +64,115 @@ public class Main : MelonMod
             _written += key;
         }
     }
-
-    public GameObject BuildKeyboard(Vector3 pos, Quaternion rot, Action<string> onKeyPressed, bool following)
+    
+    public GameObject BuildKeyboardFromJson(Vector3 pos, Quaternion rot, Action<string> onKeyPressed, Action<string> onKeyUp, Action<string> onKeyDown, bool following)
     {
         if (_cubeMesh == null)
         {
             _cubeMesh = Il2CppRUMBLE.Managers.PoolManager.instance.GetAllStructurePrefabsFromPool()[5].processableComponent.gameObject.transform.GetChild(0).gameObject;
         }
         
-        GameObject keyboard = new GameObject();
+        // Get JSON file path
+        string filePath = Path.Combine(MelonEnvironment.UserDataDirectory, "Keyboard_API", "au-layout.json");
         
+        if (!File.Exists(filePath))
+        {
+            MelonLogger.Error($"Layout file not found at: {filePath}");
+            return null;
+        }
+        
+        // Convert to raw JSON
+        string rawJson = File.ReadAllText(filePath);
+        
+        // MelonLogger.Msg(rawJson);
+
+        // Parse Into better readable data
+        List<List<KeyData>> layout = KleParser.ParseKleJson(rawJson);
+        
+        if (layout == null || layout.Count == 0)
+        {
+            MelonLogger.Error("Parsed layout is empty! Check JSON formatting or parser.");
+            return null;
+        }
+
+        MelonLogger.Msg($"Successfully parsed {layout.Count} rows.");
+        
+        // Keyboard Container
+        GameObject keyboard = new GameObject("Keyboard") {
+        transform =
+        {
+            position = pos,
+            rotation = rot
+        }};
+
+        // Add the Component
+        var keyboardComp = keyboard.AddComponent<Keyboard>();
+        keyboardComp.parent = keyboard;
+        keyboardComp.following = following;
+            
+        MelonLogger.Msg(layout);    
+
+        // Spacing
+        float keySpacing = 0.1f;
+
+        // Generate Buttons
+        for (int y = 0; y < layout.Count; y++)
+        {
+            var line = layout[y];
+            float xOffset = 0.0f;
+            for (int x = 0; x < line.Count; x++)
+            {
+                KeyData keyData = line[x];
+                MelonLogger.Msg($"{keyData.Key} | {keyData.Size}");
+                
+                List<float> sizeList = new List<float>();
+
+                foreach (string str in keyData.Size.Split("|"))
+                {
+                    sizeList.Add(float.Parse(str));
+                }
+
+                xOffset += sizeList[0]*keySpacing;
+                Vector2 keyPos =  new Vector2(xOffset, y*keySpacing + sizeList[1]*keySpacing);
+                Vector3 keySize = new Vector3(sizeList[2]*keySpacing, sizeList[3]*keySpacing, keySpacing);
+                MelonLogger.Msg($"{keyPos} | {keySize}");
+
+                if (sizeList.Count > 4)
+                {
+                    Vector2 keyPos2 =  new Vector2(keyPos.x + (sizeList[4]*keySpacing), keyPos.y + (sizeList[5]*keySpacing));
+                    Vector3 keySize2 = new Vector3(sizeList[6]*keySpacing, sizeList[7]*keySpacing, keySpacing);
+                    MelonLogger.Msg($"{keyPos2} | {keySize2}");
+                    CreateButton(keyboard, onKeyPressed, onKeyUp, onKeyDown, keyData.Key, keyPos, keySize, keyPos2, keySize2);
+                }
+                else
+                {
+                    CreateButton(keyboard, onKeyPressed, onKeyUp, onKeyDown, keyData.Key, keyPos, keySize, Vector2.zero, Vector3.zero);
+                }
+                
+                
+                xOffset += sizeList[2]*keySpacing;
+            }
+        }
+
+        return keyboard;
+    }
+    
+    /*
+    public GameObject BuildKeyboard(Vector3 pos, Quaternion rot, Action<string> onKeyPressed, bool following)
+    {
+        if (_cubeMesh == null)
+        {
+            _cubeMesh = Il2CppRUMBLE.Managers.PoolManager.instance.GetAllStructurePrefabsFromPool()[5].processableComponent.gameObject.transform.GetChild(0).gameObject;
+        }
+
+        GameObject keyboard = new GameObject();
+
         keyboard.name = "Keyboard";
         keyboard.transform.position = pos;
         keyboard.transform.rotation = rot;
         keyboard.AddComponent<Keyboard>().Parent = keyboard;
         keyboard.GetComponent<Keyboard>().Following = following;
-        
+
         /*
         var outText = Create.NewText();
         outText.transform.parent = Keyboard.transform;
@@ -81,7 +180,7 @@ public class Main : MelonMod
         outText.transform.localRotation = Quaternion.identity;
         outText.transform.GetComponent<TextMeshPro>().text = "Test";
         outText.name = "Text";
-        */
+        / *
 
         var keys = "0;Q;W;E;R;T;Z;U;I;O;P;A;S;D;F;G;H;J;K;L; ;Y;X;C;V;B;N;M; ; ; ; ;".Split(";");
 
@@ -132,7 +231,6 @@ public class Main : MelonMod
             x = 0;
         }
         
-        /*
         Vector3 offset = new Vector3(0.12f * 5f, 0.0f, -0.12f * 2f);
         
         for (int x = 0; x < 10; x++)
@@ -149,232 +247,140 @@ public class Main : MelonMod
         }
         
         CreateNewBigButton(new Vector3(0.12f * 7, 0.0f, -0.12f * 2) - offset, Quaternion.identity, "Enter", 3, 0.12f, keyboard, onKeyPressed);
-        
-        */
 
         return keyboard;
-    }
+    }*/
 
-    private void CreateNewButton(Vector3 position, Quaternion rotation, String letter, GameObject keyboard, Action<string> onKeyPressed)
+    private void CreateButton(GameObject keyboard, Action<string> onKeyPressed, Action<string> onKeyUp, Action<string> onKeyDown, String letter, Vector2 offset, Vector3 size, Vector2 offset2, Vector3 size2)
     {
-        var gameObject = new GameObject();
-        gameObject.transform.parent = keyboard.transform;
-        gameObject.transform.localPosition = position;
-        gameObject.transform.localRotation = rotation;
-        gameObject.name = letter;
-        gameObject.AddComponent<Button>().Parent = gameObject;
-        gameObject.GetComponent<Button>().Letter = letter;
-        gameObject.GetComponent<Button>().OnPressed += onKeyPressed;
-                
-        var newCube = Object.Instantiate(_cubeMesh, gameObject.transform);
-        newCube.transform.localPosition = Vector3.zero;
-        newCube.transform.localRotation = Quaternion.identity;
-        newCube.transform.localScale = Vector3.one / 10f;
-        newCube.name = "Button";
-                
-        var text = Create.NewText();
-        text.transform.parent = newCube.transform;
-        text.transform.localPosition = new Vector3(0.0f, 0.62f, 0.0f);
-        text.transform.localRotation = Quaternion.Euler(90, 0, 0);
-        text.transform.localScale = new Vector3(4.0f, 10.0f, 10.0f);
-        text.transform.GetComponent<TextMeshPro>().text = letter;
-    }
+        var gameObject = new GameObject { 
+        transform =
+        {
+            parent = keyboard.transform,
+            localPosition = Vector3.zero,
+            localRotation = Quaternion.identity
+        }, name = letter};
+        gameObject.AddComponent<KeyboardButton>().letter = letter;
+        gameObject.GetComponent<KeyboardButton>().OnButtonPressed += onKeyPressed;
+        gameObject.GetComponent<KeyboardButton>().OnButtonUp += onKeyUp;
+        gameObject.GetComponent<KeyboardButton>().OnButtonDown += onKeyDown;
+        
+        var firstCube = Object.Instantiate(_cubeMesh, gameObject.transform);
+        firstCube.transform.localPosition = new Vector3(
+            offset.x + (size.x / 2f),
+            offset.y + (size.y / 2f),
+            0f
+        );
+        firstCube.transform.localRotation = Quaternion.identity;
+        firstCube.transform.localScale = size;
+        firstCube.name = "Button1";
 
-    private void CreateNewBigButton(Vector3 position, Quaternion rotation, String letter, Vector2 scale, float size, GameObject keyboard, Action<string> onKeyPressed, Action<string> onKeyUp, Action<string> onKeyDown, Vector3? textSize = null)
-    {
-        Vector3 finalTextSize = textSize ?? new Vector3(4f, 10f, 10f);
-        List<GameObject> gameobjects = new List<GameObject>();
-        
-        var gameObject = new GameObject();
-        gameObject.transform.parent = keyboard.transform;
-        gameObject.transform.localPosition = position;
-        gameObject.transform.localRotation = rotation;
-        gameObject.name = letter;
-        gameObject.AddComponent<Keyboard_Button>().Letter = letter;
-        gameObject.GetComponent<Keyboard_Button>().OnButtonPressed += onKeyPressed;
-        gameObject.GetComponent<Keyboard_Button>().OnButtonUp += onKeyUp;
-        gameObject.GetComponent<Keyboard_Button>().OnButtonDown += onKeyDown;
-        gameobjects.Add(gameObject);
-            
-        var newCube = Object.Instantiate(_cubeMesh, gameObject.transform);
-        newCube.transform.localPosition = new Vector3((scale.x/2 -0.5f) * size, 0.0f, -(scale.y/2 -0.5f) * size);
-        newCube.transform.localRotation = Quaternion.identity;
-        
-        Vector2 scaledScale = scale * (size+0.02f);
-        scaledScale = new Vector2(scaledScale.x - 0.02f, scaledScale.y - 0.02f);
-        
-        newCube.transform.localScale = new Vector3(scaledScale.x, 0.1f, scaledScale.y);
-        newCube.name = "Button";
-            
-        var text = Create.NewText();
-        text.transform.parent = newCube.transform;
-        text.transform.localPosition = new Vector3(0.0f, 0.62f, 0.0f);
-        text.transform.localRotation = Quaternion.Euler(90, 0, 0);
-        text.transform.localScale = finalTextSize;
-        text.transform.GetComponent<TextMeshPro>().text = letter;
-        
-        position = new Vector3(position.x + size, position.y + size, position.z);
-        
-        for (int y = 0; y < scale.y; y++)
+        if (size2.z != 0.0f)
         {
-            for (int x = 0; x < scale.x; x++)
-            {
-                gameObject = new GameObject();
-                gameObject.transform.parent = keyboard.transform;
-                gameObject.transform.localPosition = new Vector3((float)(position.x + x*(size+0.02)), position.y, -(float)(position.z + y*(size+0.02)));
-                gameObject.transform.localRotation = rotation;
-                gameObject.name = letter;
-            
-                gameobjects.Add(gameObject);
-            }
-        }
-        
-        gameobjects[0].GetComponent<Keyboard_Button>().buttonParts = gameobjects.ToArray();
-        gameobjects[0].GetComponent<Keyboard_Button>().Default_Position = new Vector3((scale.x/2 -0.5f) * size, 0.0f, -(scale.y/2 -0.5f) * size);
-        
-        /*
-        Vector3 finalTextSize = textSize ?? new Vector3(4f, 10f, 10f);
-        List<GameObject> gameobjects = new List<GameObject>();
-        
-        var gameObject = new GameObject();
-        gameObject.transform.parent = keyboard.transform;
-        gameObject.transform.localPosition = position;
-        gameObject.transform.localRotation = rotation;
-        gameObject.name = letter;
-        gameObject.AddComponent<Big_Button>().Letter = letter;
-        gameObject.GetComponent<Big_Button>().OnPressed += onKeyPressed;
-        gameobjects.Add(gameObject);
-            
-        var newCube = Object.Instantiate(_cubeMesh, gameObject.transform);
-        newCube.transform.localPosition = new Vector3(((float)cnt/2 -0.5f) * 0.12f, 0.0f, 0.0f);
-        newCube.transform.localRotation = Quaternion.identity;
-        float scale = (cnt - 1) * size + 0.1f;
-        newCube.transform.localScale = new Vector3(scale, 0.1f, 0.1f);
-        newCube.name = "Button";
-            
-        var text = Create.NewText();
-        text.transform.parent = newCube.transform;
-        text.transform.localPosition = new Vector3(0.0f, 0.62f, 0.0f);
-        text.transform.localRotation = Quaternion.Euler(90, 0, 0); 
-        text.transform.localScale = finalTextSize;
-        text.transform.GetComponent<TextMeshPro>().text = letter;
-        
-        position = new Vector3(position.x + size, position.y, position.z);
-        
-        for (int x = 0; x < cnt-1; x++)
-        {
-            gameObject = new GameObject();
-            gameObject.transform.parent = keyboard.transform;
-            gameObject.transform.localPosition = new Vector3(position.x + x*size, 0.0f, position.z);
-            gameObject.transform.localRotation = rotation;
-            gameObject.name = letter;
-            
-            gameobjects.Add(gameObject);
-        }
-        
-        gameobjects[0].GetComponent<Big_Button>().Parents = gameobjects.ToArray();
-        gameobjects[0].GetComponent<Big_Button>().Default_Position = new Vector3(((float)cnt/2 -0.5f) * 0.12f, 0.0f, 0.0f);
-        */
-    }
-}
-
-[RegisterTypeInIl2Cpp]
-internal class Button : MonoBehaviour
-{
-    public String Letter = "OO";
-    public GameObject Parent;
-    public Boolean Pressed = false;
-    public event Action<string> OnPressed;
-
-    public void FixedUpdate()
-    {
-        var player = RumbleModdingAPI.RMAPI.Calls.Players.GetLocalPlayer();
-        if (player == null) return;
-        if (Parent == null) return;
-
-        if (player.Controller?.PlayerScaling?.rigDefinition == null) return;
-    
-        Vector3 rightHandPos = RumbleModdingAPI.RMAPI.Calls.Players.GetLocalPlayer().Controller.PlayerHandPresence.righthand.Index.BoneC.position;
-        Vector3 leftHandPos = RumbleModdingAPI.RMAPI.Calls.Players.GetLocalPlayer().Controller.PlayerHandPresence.lefthand.Index.BoneC.position;
-        
-        Vector3 pos = Parent.transform.position;
-        Quaternion rot = Parent.transform.rotation;
-
-        float size = 0.02f;
-        Vector3 normal = rot * Vector3.up;
-        
-        Vector3 pos_point = pos + (normal * 0.14f);
-        pos += normal * size;
-        
-        float distRight = Vector3.Magnitude(rightHandPos - pos_point);
-        float distLeft = Vector3.Magnitude(leftHandPos - pos_point);
-        
-        if (distLeft < 0.1f)
-        {
-            Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates.lHandInput = new PlayerHandPresence.HandPresenceInput(0.0f, 1.0f, 1.0f, 0.0f);
-        }
-        else
-        {
-            Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates.lHandInput = null;
-        }
-        if (distRight < 0.1f)
-        {
-            Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates.rHandInput = new PlayerHandPresence.HandPresenceInput(0.0f, 1.0f, 1.0f, 0.0f);
-        }
-        else
-        {
-            Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates.rHandInput = null;
-        }
-        
-        distRight = Vector3.Magnitude(rightHandPos - pos);
-        distLeft = Vector3.Magnitude(leftHandPos - pos);
-    
-        float dist = Math.Min(distRight, distLeft);
-        
-        if (dist < 0.08f)
-        {
-            Pressed = true;
-            
-            Parent.transform.GetChild(0).transform.localPosition = Vector3.Lerp(new Vector3(0.0f, 0.0f, 0.0f), new Vector3(0.0f, -0.1f, 0.0f), 2);
-        }
-        else if (Pressed)
-        {
-            Pressed = false;
-            Parent.transform.GetChild(0).transform.localPosition = new Vector3(0.0f, 0.0f, 0.0f);
-            
-            OnPressed?.Invoke(Letter);
-            // Parent.transform.parent.GetChild(0).GetComponent<TextMeshPro>().text = Parent.transform.parent.GetChild(0).GetComponent<TextMeshPro>().text + Letter;
+            var secondCube = Object.Instantiate(_cubeMesh, gameObject.transform);
+            secondCube.transform.localPosition = new Vector3(
+                offset2.x + (size2.x / 2f), 
+                offset2.y + (size2.y / 2f), 
+                0f
+            );
+            secondCube.transform.localRotation = Quaternion.identity;
+            secondCube.transform.localScale = size2;
+            secondCube.name = "Button2";
         }
     }
 }
 
 [RegisterTypeInIl2Cpp]
-internal class Keyboard_Button : MonoBehaviour
+internal class KeyboardButton : MonoBehaviour
 {
-    public String Letter = "OO";
+    public String letter = "OO";
     public event Action<string>? OnButtonPressed;
     public event Action<string>? OnButtonDown;
     public event Action<string>? OnButtonUp;
     
-    public GameObject[]? buttonParts;
-    public Boolean pressed = false;
+    public Boolean pressed;
     
-    public Vector3 Default_Position = new Vector3(0.0f, 0.0f, 0.0f);
+    private bool IsPointInCube(Vector3 firstPos, Vector3 secondPos, Vector3 point)
+    {
+        // Find the minimum and maximum boundaries for each axis
+        float minX = Mathf.Min(firstPos.x, secondPos.x);
+        float maxX = Mathf.Max(firstPos.x, secondPos.x);
+
+        float minY = Mathf.Min(firstPos.y, secondPos.y);
+        float maxY = Mathf.Max(firstPos.y, secondPos.y);
+
+        float minZ = Mathf.Min(firstPos.z, secondPos.z);
+        float maxZ = Mathf.Max(firstPos.z, secondPos.z);
+
+        // Check if the point lies within all three bounds
+        return (point.x >= minX && point.x <= maxX) &&
+               (point.y >= minY && point.y <= maxY) &&
+               (point.z >= minZ && point.z <= maxZ);
+    }
     
     public void FixedUpdate()
     {
         var player = RumbleModdingAPI.RMAPI.Calls.Players.GetLocalPlayer();
         if (player == null) return;
-        if (buttonParts == null) return;
 
         if (player.Controller?.PlayerScaling?.rigDefinition == null) return;
-        
     
         Vector3 rightHandPos = RumbleModdingAPI.RMAPI.Calls.Players.GetLocalPlayer().Controller.PlayerHandPresence.righthand.Index.BoneC.position;
         Vector3 leftHandPos = RumbleModdingAPI.RMAPI.Calls.Players.GetLocalPlayer().Controller.PlayerHandPresence.lefthand.Index.BoneC.position;
-
-        var is_pressed = false;
         
+        int childCount = transform.childCount;
+        for (int i = 0; i < childCount; i++)
+        {
+            Transform child = transform.GetChild(i);
+            
+            var firstPos = child.position - child.right*(child.localScale.x/2f) - child.up*(child.localScale.z/2f);
+            var secondPos = child.position + child.right*(child.localScale.x/2f) + child.up*(child.localScale.z/2f) + child.forward*child.localScale.z + child.forward*(child.localScale.z*0.75f*Convert.ToInt32(pressed));
+
+            float distRight = Vector3.Magnitude(rightHandPos - child.position);
+            float distLeft = Vector3.Magnitude(leftHandPos - child.position);
+        
+            if (distLeft < 0.2f)
+            {
+                Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates.LHandInput = new PlayerHandPresence.HandPresenceInput(0.0f, 1.0f, 1.0f, 0.0f);
+            }
+            else
+            {
+                Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates.LHandInput = null;
+            }
+            if (distRight < 0.2f)
+            {
+                Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates.RHandInput = new PlayerHandPresence.HandPresenceInput(0.0f, 1.0f, 1.0f, 0.0f);
+            }
+            else
+            {
+                Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates.RHandInput = null;
+            }
+
+            if (IsPointInCube(firstPos, secondPos, leftHandPos) || IsPointInCube(firstPos, secondPos, rightHandPos))
+            {
+                pressed = true;
+                
+                if (OnButtonDown != null) OnButtonDown?.Invoke(letter);
+            }
+            else if (pressed)
+            {
+                pressed = false;
+                
+                if (OnButtonUp != null) OnButtonUp?.Invoke(letter);
+            }
+        }
+
+        if (pressed)
+        {
+            transform.localPosition = new Vector3(0, 0, transform.GetChild(0).localScale.z*-0.75f);
+            if (OnButtonPressed != null) OnButtonPressed?.Invoke(letter);
+        }
+        else
+        {
+            transform.localPosition = new Vector3(0, 0, 0);
+        }
+        
+        /*
         foreach (GameObject parent in buttonParts)
         {
             Vector3 pos = parent.transform.position;
@@ -432,112 +438,32 @@ internal class Keyboard_Button : MonoBehaviour
             if (OnButtonUp != null) OnButtonUp?.Invoke(Letter);
             
             if (OnButtonPressed != null) OnButtonPressed?.Invoke(Letter);
-        }
-    }
-}
-
-[RegisterTypeInIl2Cpp]
-internal class Big_Button : MonoBehaviour
-{
-    public String Letter = "OO";
-    public GameObject[] Parents;
-    public Boolean Pressed = false;
-    public Vector3 Default_Position = new Vector3(0.0f, 0.0f, 0.0f);
-    public event Action<string> OnPressed;
-
-    public void FixedUpdate()
-    {
-        var player = RumbleModdingAPI.RMAPI.Calls.Players.GetLocalPlayer();
-        if (player == null) return;
-        if (Parents == null) return;
-
-        if (player.Controller?.PlayerScaling?.rigDefinition == null) return;
-        
-    
-        Vector3 rightHandPos = RumbleModdingAPI.RMAPI.Calls.Players.GetLocalPlayer().Controller.PlayerHandPresence.righthand.Index.BoneC.position;
-        Vector3 leftHandPos = RumbleModdingAPI.RMAPI.Calls.Players.GetLocalPlayer().Controller.PlayerHandPresence.lefthand.Index.BoneC.position;
-
-        var is_pressed = false;
-        
-        foreach (GameObject parent in Parents)
-        {
-            Vector3 pos = parent.transform.position;
-            Quaternion rot = parent.transform.rotation;
-
-            float size = 0.02f;
-            Vector3 normal = rot * Vector3.up;
-            
-            Vector3 pos_point = pos + (normal * 0.14f);
-            pos += normal * size;
-        
-            float distRight = Vector3.Magnitude(rightHandPos - pos_point);
-            float distLeft = Vector3.Magnitude(leftHandPos - pos_point);
-        
-            if (distLeft < 0.1f)
-            {
-                Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates.lHandInput = new PlayerHandPresence.HandPresenceInput(0.0f, 1.0f, 1.0f, 0.0f);
-            }
-            else
-            {
-                Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates.lHandInput = null;
-            }
-            if (distRight < 0.1f)
-            {
-                Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates.rHandInput = new PlayerHandPresence.HandPresenceInput(0.0f, 1.0f, 1.0f, 0.0f);
-            }
-            else
-            {
-                Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates.rHandInput = null;
-            }
-            
-            distRight = Vector3.Magnitude(rightHandPos - pos);
-            distLeft = Vector3.Magnitude(leftHandPos - pos);
-
-            float dist = Math.Min(distRight, distLeft);
-
-            if (dist < 0.08f)
-            {
-                is_pressed = true;
-            }
-        }
-
-        if (is_pressed)
-        {
-            Pressed = true;
-            Parents[0].transform.GetChild(0).transform.localPosition = Vector3.Lerp(Default_Position, new Vector3(Default_Position.x, -0.1f, Default_Position.z), 2);
-        }
-        else if (Pressed)
-        {
-            Pressed = false;
-            Parents[0].transform.GetChild(0).transform.localPosition = Default_Position;
-            OnPressed?.Invoke(Letter);
-            // Parents[0].transform.parent.GetChild(0).GetComponent<TextMeshPro>().text = Parents[0].transform.parent.GetChild(0).GetComponent<TextMeshPro>().text + Letter;
-        }
+        }*/
     }
 }
 
 [RegisterTypeInIl2Cpp]
 internal class Keyboard : MonoBehaviour
 {
-    public bool Following = false;
+    public bool following = false;
     public float distance = 0.35f;
-    public GameObject? Parent;
-    public float player_height = 1.2f;
+    public GameObject? parent;
+    public float playerHeight = 1.2f;
     
     public float positionSmoothTime = 0.2f;
     public float rotationSmoothSpeed = 5f;
     
-    private Vector3 velocity = Vector3.zero;
-    private Quaternion? lastTargetRotation;
+    private Vector3 _velocity = Vector3.zero;
+    private Quaternion? _lastTargetRotation;
     
     public void Update()
     {
         var player = RumbleModdingAPI.RMAPI.Calls.Players.GetLocalPlayer();
         if (player == null) return;
-        if (Parent == null) return;
-        if (lastTargetRotation == null) lastTargetRotation = Parent.transform.rotation;
+        if (parent == null) return;
+        _lastTargetRotation ??= parent.transform.rotation;
 
-        if (Following)
+        if (following)
         {
             
             var cam = Camera.main;
@@ -557,16 +483,16 @@ internal class Keyboard : MonoBehaviour
             {
                 Quaternion desiredRotation = Quaternion.LookRotation(dir) * Quaternion.Euler(-45f, 0f, 0f);
                 
-                Parent.transform.rotation = Quaternion.Slerp(
-                    Parent.transform.rotation,
+                parent.transform.rotation = Quaternion.Slerp(
+                    parent.transform.rotation,
                     desiredRotation,
                     Time.deltaTime * rotationSmoothSpeed
                 );
             }
             
-            newPos.y += player_height;
+            newPos.y += playerHeight;
             
-            float angleDifference = Quaternion.Angle((Quaternion)lastTargetRotation, Parent.transform.rotation);
+            float angleDifference = Quaternion.Angle((Quaternion)_lastTargetRotation, parent.transform.rotation);
             
             float dynamicSmoothTime = positionSmoothTime;
             
@@ -575,14 +501,14 @@ internal class Keyboard : MonoBehaviour
                 dynamicSmoothTime = 0.05f;
             }
             
-            Parent.transform.position = Vector3.SmoothDamp(
-                Parent.transform.position,
+            parent.transform.position = Vector3.SmoothDamp(
+                parent.transform.position,
                 newPos,
-                ref velocity,
+                ref _velocity,
                 dynamicSmoothTime
             );
 
-            lastTargetRotation = Parent.transform.rotation;
+            _lastTargetRotation = parent.transform.rotation;
         }
     }
 }
@@ -590,8 +516,8 @@ internal class Keyboard : MonoBehaviour
 [HarmonyPatch(typeof(PlayerHandPresence), nameof(PlayerHandPresence.UpdateHandPresenceAnimationStates))]
 public class Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates
 {
-    public static PlayerHandPresence.HandPresenceInput? lHandInput;
-    public static PlayerHandPresence.HandPresenceInput? rHandInput;
+    public static PlayerHandPresence.HandPresenceInput? LHandInput;
+    public static PlayerHandPresence.HandPresenceInput? RHandInput;
     
     static void Prefix(PlayerHandPresence __instance, InputManager.Hand hand, ref PlayerHandPresence.HandPresenceInput input)
     {
@@ -599,10 +525,10 @@ public class Patch_PlayerHandPresence_UpdateHandPresenceAnimationStates
         
         if (__instance.parentController.ControllerType != ControllerType.Local) return;
         
-        if (hand == InputManager.Hand.Left && lHandInput is { } l)
+        if (hand == InputManager.Hand.Left && LHandInput is { } l)
             input = l;
 
-        if (hand == InputManager.Hand.Right && rHandInput is { } r)
+        if (hand == InputManager.Hand.Right && RHandInput is { } r)
             input = r;
     }
 }
